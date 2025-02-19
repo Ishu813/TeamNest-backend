@@ -1,6 +1,4 @@
-if (process.env.NODE_ENV != "production") {
-  require("dotenv").config();
-}
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
@@ -45,12 +43,12 @@ app.use(methodOverride("_method"));
 const store = MongoStore.create({
   mongoUrl: MONGO_URL,
   crypto: {
-    sercret: process.env.SECRET,
+    secret: process.env.SECRET,
   },
   touchAfter: 24 * 3600,
 });
 
-store.on("error", () => {
+store.on("error", (err) => {
   console.log("ERROR in MONGO SESSION", err);
 });
 
@@ -63,6 +61,8 @@ const sessionOptions = {
     expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
     maxage: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
+    secure: false,
+    sameSite: "lax",
   },
 };
 
@@ -72,8 +72,24 @@ app.use(passport.initialize());
 app.use(passport.session());
 passport.use(new LocalStrategy(User.authenticate()));
 
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+passport.serializeUser((user, done) => {
+  console.log(user.id);
+  done(null, user.id); // Only store user ID in session
+});
+
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user); // Attach user object to req.user
+  } catch (err) {
+    done(err, null);
+  }
+});
+
+app.use((req, res, next) => {
+  console.log(req.session);
+  next();
+});
 
 app.get("/", (req, res) => {
   res.send("Hi! I am root");
