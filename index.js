@@ -58,7 +58,7 @@ const sessionOptions = {
   store,
   secret: process.env.SECRET,
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true,
   cookie: {
     expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
     maxage: 7 * 24 * 60 * 60 * 1000,
@@ -67,6 +67,8 @@ const sessionOptions = {
     sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
   },
 };
+
+app.set("trust proxy", 1);
 
 app.use(session(sessionOptions));
 
@@ -89,7 +91,8 @@ passport.deserializeUser(async (id, done) => {
 });
 
 app.use((req, res, next) => {
-  console.log(req.session);
+  console.log("Set-Cookie header:", res.getHeader("Set-Cookie"));
+  console.log(req.session.passport);
   next();
 });
 
@@ -237,7 +240,7 @@ app.post("/login", async (req, res, next) => {
         console.log("A User Logged In with Username :", username);
         console.log("Session after login:", req.session);
 
-        req.session.save(() => {
+        req.session.save((err) => {
           res.status(200).json({
             message: "Login successful!",
             user: {
