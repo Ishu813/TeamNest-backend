@@ -56,13 +56,13 @@ const sessionOptions = {
   store,
   secret: process.env.SECRET,
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   cookie: {
     expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
     maxage: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
-    secure: false,
-    sameSite: "lax",
+    secure: true,
+    sameSite: "None",
   },
 };
 
@@ -190,9 +190,11 @@ app.post(
           return res.status(500).json({ message: "Failed to log in!" });
         }
         console.log("A User registered with Username :", username);
-        res.status(201).json({
-          message: "Signup and Login successful!",
-          user: req.user,
+        req.session.save(() => {
+          res.status(201).json({
+            message: "Signup and Login successful!",
+            user: req.user,
+          });
         });
       });
     } catch (error) {
@@ -229,13 +231,15 @@ app.post("/login", async (req, res, next) => {
           return res.status(500).json({ message: "Failed to log in." });
         }
         console.log("A User Logged In with Username :", username);
-        res.status(200).json({
-          message: "Login successful!",
-          user: {
-            _id: user._id,
-            name: user.name,
-            username: user.username,
-          },
+        req.session.save(() => {
+          res.status(200).json({
+            message: "Login successful!",
+            user: {
+              _id: user._id,
+              name: user.name,
+              username: user.username,
+            },
+          });
         });
       });
     })(req, res, next);
