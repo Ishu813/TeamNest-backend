@@ -62,7 +62,7 @@ const sessionOptions = {
     maxage: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
     secure: true,
-    sameSite: "None",
+    sameSite: "Lax",
   },
 };
 
@@ -190,6 +190,8 @@ app.post(
           return res.status(500).json({ message: "Failed to log in!" });
         }
         console.log("A User registered with Username :", username);
+        console.log("Session after signup:", req.session);
+
         req.session.save(() => {
           res.status(201).json({
             message: "Signup and Login successful!",
@@ -231,6 +233,8 @@ app.post("/login", async (req, res, next) => {
           return res.status(500).json({ message: "Failed to log in." });
         }
         console.log("A User Logged In with Username :", username);
+        console.log("Session after login:", req.session);
+
         req.session.save(() => {
           res.status(200).json({
             message: "Login successful!",
