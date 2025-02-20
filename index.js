@@ -77,7 +77,6 @@ app.use(passport.session());
 passport.use(User.createStrategy());
 
 passport.serializeUser((user, done) => {
-  console.log(user.id);
   done(null, user.id); // Only store user ID in session
 });
 
@@ -88,12 +87,6 @@ passport.deserializeUser(async (id, done) => {
   } catch (err) {
     done(err, null);
   }
-});
-
-app.use((req, res, next) => {
-  console.log("Set-Cookie header:", res.getHeader("Set-Cookie"));
-  console.log(req.session.passport);
-  next();
 });
 
 app.get("/", (req, res) => {
