@@ -33,6 +33,8 @@ async function main() {
 const corsOptions = {
   origin: process.env.ORIGIN_PORT, // React app's URL
   credentials: true, // Allow cookies and credentials
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Ensure all necessary methods are allowed
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
