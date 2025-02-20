@@ -72,7 +72,7 @@ app.use(session(sessionOptions));
 
 app.use(passport.initialize());
 app.use(passport.session());
-passport.use(new LocalStrategy(User.authenticate()));
+passport.use(User.createStrategy());
 
 passport.serializeUser((user, done) => {
   console.log(user.id);
