@@ -188,7 +188,6 @@ app.post(
           return res.status(500).json({ message: "Failed to log in!" });
         }
         console.log("A User registered with Username :", username);
-        console.log("Session after signup:", req.session);
 
         req.session.save(() => {
           res.status(201).json({
@@ -231,7 +230,6 @@ app.post("/login", async (req, res, next) => {
           return res.status(500).json({ message: "Failed to log in." });
         }
         console.log("A User Logged In with Username :", username);
-        console.log("Session after login:", req.session);
 
         req.session.save((err) => {
           res.status(200).json({
