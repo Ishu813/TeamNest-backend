@@ -5,7 +5,7 @@ TeamNest is a backend service designed to power the remote collaboration platfor
 ## Features
 
 - **User Authentication & Authorization**: Secure login and registration using Passport.js.
-- **Real-time Messaging**: Supports direct and team-based communication.
+- **Messaging**: Supports direct and team-based communication.
 - **User & Team Management**: Create and manage users and teams.
 - **Project & Task Management**: Assign projects, create, update, and delete tasks.
 
@@ -13,7 +13,7 @@ TeamNest is a backend service designed to power the remote collaboration platfor
 
 - **Backend**: Node.js, Express.js
 - **Database**: MongoDB
-- **Authentication**: Passport.js with JWT
+- **Authentication**: passport-local-mongoose
 - **API Documentation**: Postman
 
 ## Getting Started
