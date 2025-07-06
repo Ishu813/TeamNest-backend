@@ -49,9 +49,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride("_method"));
 
 const server = http.createServer(app);
+
+const origin_port = process.env.ORIGIN_PORT;
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // set to frontend URL in production
+    origin: origin_port, // set to frontend URL in production
     methods: ["GET", "POST"],
     credentials: true,
   },
