@@ -1,16 +1,20 @@
-if (process.env.NODE_ENV != "production") {
+if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
 const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
-const User = require("./models/user.js");
 const cors = require("cors");
 const methodOverride = require("method-override");
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
 const passport = require("passport");
+const http = require("http");
+const { Server } = require("socket.io");
+
+const User = require("./models/user.js");
+const Chat = require("./models/chat.js");
 const ExpressError = require("./utils/ExpressError.js");
 
 const chatRouter = require("./routes/chat.js");
@@ -19,28 +23,18 @@ const taskRouter = require("./routes/task.js");
 const teamRouter = require("./routes/team.js");
 const userRouter = require("./routes/user.js");
 
-const Chat = require("./models/chat.js");
-
-const http = require("http");
-const { Server } = require("socket.io");
-
 const MONGO_URL = process.env.MONGO_URL;
+const ORIGIN = process.env.ORIGIN_PORT;
+const PORT = process.env.PORT || 5000;
 
-main()
-  .then(() => {
-    console.log("connected to database");
-  })
-  .catch((err) => {
-    console.log(err);
-  });
-
-async function main() {
-  await mongoose.connect(MONGO_URL);
-}
+mongoose
+  .connect(MONGO_URL)
+  .then(() => console.log("Connected to MongoDB"))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
 const corsOptions = {
-  origin: process.env.ORIGIN_PORT, // React app's URL
-  credentials: true, // Allow cookies and credentials
+  origin: ORIGIN,
+  credentials: true,
 };
 
 app.use(cors(corsOptions));
@@ -50,10 +44,9 @@ app.use(methodOverride("_method"));
 
 const server = http.createServer(app);
 
-const origin_port = process.env.ORIGIN_PORT;
 const io = new Server(server, {
   cors: {
-    origin: origin_port, // set to frontend URL in production
+    origin: ORIGIN,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -61,54 +54,44 @@ const io = new Server(server, {
 
 const store = MongoStore.create({
   mongoUrl: MONGO_URL,
-  crypto: {
-    secret: process.env.SECRET,
-  },
+  crypto: { secret: process.env.SECRET },
   touchAfter: 24 * 3600,
 });
 
 store.on("error", (err) => {
-  console.log("ERROR in MONGO SESSION", err);
+  console.error("MongoStore session error:", err);
 });
 
 const sessionOptions = {
   store,
   secret: process.env.SECRET,
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   cookie: {
-    expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
-    maxage: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
   },
 };
 
 app.set("trust proxy", 1);
-
 app.use(session(sessionOptions));
-
 app.use(passport.initialize());
 app.use(passport.session());
+
 passport.use(User.createStrategy());
-
-passport.serializeUser((user, done) => {
-  done(null, user.id); // Only store user ID in session
-});
-
+passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
   try {
     const user = await User.findById(id);
-    done(null, user); // Attach user object to req.user
+    done(null, user);
   } catch (err) {
-    done(err, null);
+    done(err);
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("Hi! I am root");
-});
+app.get("/", (req, res) => res.send("Hi! I am root"));
 
 app.use("/chats", chatRouter);
 app.use("/projects", projectRouter);
@@ -116,40 +99,31 @@ app.use("/tasks", taskRouter);
 app.use("/teams", teamRouter);
 app.use("/", userRouter);
 
+// ========== SOCKET.IO ==========
 let onlineUsers = {};
 
 io.on("connection", (socket) => {
-  console.log("User connected", socket.id);
+  console.log("Socket connected:", socket.id);
 
   socket.on("join", async (username) => {
     onlineUsers[username] = socket.id;
-    const user = await User.findOne({ username: username });
+
+    const user = await User.findOne({ username });
     if (user) {
       user.status = "online";
       await user.save();
     }
+
     console.log(`${username} joined`);
   });
 
-  socket.on("private_message", async ({ receiver, sender, message }) => {
-    const newMessage = new Chat({
-      sender: sender,
-      receiver: receiver,
-      message: message,
-    });
+  socket.on("private_message", async ({ sender, receiver, message }) => {
+    const newMessage = new Chat({ sender, receiver, message });
     await newMessage.save();
 
-    // Send message to receiver (if online)
-    if (onlineUsers[receiver]) {
-      io.to(onlineUsers[receiver]).emit("private-message", {
-        sender,
-        message,
-      });
-    }
-
-    // ALSO send message back to sender (to show it in their chat view)
-    if (onlineUsers[sender]) {
-      io.to(onlineUsers[sender]).emit("private-message", {
+    const receiverSocketId = onlineUsers[receiver];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("receive_private_message", {
         sender,
         message,
       });
@@ -162,43 +136,30 @@ io.on("connection", (socket) => {
   });
 
   socket.on("group_message", async ({ teamId, sender, message }) => {
-    const newMessage = new Chat({
-      sender,
-      message,
-      teamId, // save teamId instead of receiver
-    });
+    const newMessage = new Chat({ sender, teamId, message });
     await newMessage.save();
 
-    // Send message to all in the team room
     io.to(teamId).emit("group-message", { sender, message, teamId });
-    console.log(`Group message in team ${teamId} from ${sender}: ${message}`);
   });
 
   socket.on("disconnect", async () => {
     const username = Object.keys(onlineUsers).find(
       (key) => onlineUsers[key] === socket.id
     );
-
     if (username) {
       delete onlineUsers[username];
 
-      try {
-        const user = await User.findOne({ username });
-        if (user) {
-          user.status = "offline";
-          await user.save();
-        }
-
-        console.log(`${username} is offline`);
-      } catch (err) {
-        console.error("Error setting user offline:", err);
+      const user = await User.findOne({ username });
+      if (user) {
+        user.status = "offline";
+        await user.save();
       }
+
+      console.log(`${username} disconnected`);
     }
   });
 });
 
-const PORT = process.env.PORT;
-
 server.listen(PORT, () => {
-  console.log(`server is listening on port ${PORT}`);
+  console.log(`Server is listening on port ${PORT}`);
 });
