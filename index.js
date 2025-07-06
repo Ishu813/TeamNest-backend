@@ -138,24 +138,6 @@ io.on("connection", (socket) => {
       message: message,
     });
     await newMessage.save();
-    const receiverSocket = onlineUsers[receiver];
-    const senderSocket = onlineUsers[sender];
-
-    // Emit to receiver
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("private_message", {
-        sender: sender,
-        message: message,
-      });
-    }
-
-    // Emit back to sender
-    if (senderSocket) {
-      io.to(senderSocket).emit("private_message", {
-        sender: sender,
-        message: message,
-      });
-    }
   });
 
   socket.on("join-team", (teamId) => {
