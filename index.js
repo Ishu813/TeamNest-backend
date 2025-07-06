@@ -19,6 +19,11 @@ const taskRouter = require("./routes/task.js");
 const teamRouter = require("./routes/team.js");
 const userRouter = require("./routes/user.js");
 
+const Chat = require("./models/chat.js");
+
+const http = require("http");
+const { Server } = require("socket.io");
+
 const MONGO_URL = process.env.MONGO_URL;
 
 main()
@@ -42,6 +47,15 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride("_method"));
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173", // set to frontend URL in production
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
 
 const store = MongoStore.create({
   mongoUrl: MONGO_URL,
@@ -100,12 +114,91 @@ app.use("/tasks", taskRouter);
 app.use("/teams", teamRouter);
 app.use("/", userRouter);
 
-app.all("*", (req, res, next) => {
-  next(new ExpressError(404, "Page not found!"));
+let onlineUsers = {};
+
+io.on("connection", (socket) => {
+  console.log("User connected", socket.id);
+
+  socket.on("join", async (username) => {
+    onlineUsers[username] = socket.id;
+    const user = await User.findOne({ username: username });
+    if (user) {
+      user.status = "online";
+      await user.save();
+    }
+    console.log(`${username} joined`);
+  });
+
+  socket.on("private_message", async ({ receiver, sender, message }) => {
+    const newMessage = new Chat({
+      sender: sender,
+      receiver: receiver,
+      message: message,
+    });
+    await newMessage.save();
+    const receiverSocket = onlineUsers[receiver];
+    const senderSocket = onlineUsers[sender];
+
+    // Emit to receiver
+    if (receiverSocket) {
+      io.to(receiverSocket).emit("private_message", {
+        sender: sender,
+        message: message,
+      });
+    }
+
+    // Emit back to sender
+    if (senderSocket) {
+      io.to(senderSocket).emit("private_message", {
+        sender: sender,
+        message: message,
+      });
+    }
+  });
+
+  socket.on("join-team", (teamId) => {
+    socket.join(teamId);
+    console.log(`User ${socket.id} joined team ${teamId}`);
+  });
+
+  socket.on("group_message", async ({ teamId, sender, message }) => {
+    const newMessage = new Chat({
+      sender,
+      message,
+      teamId, // save teamId instead of receiver
+    });
+    await newMessage.save();
+
+    // Send message to all in the team room
+    io.to(teamId).emit("group-message", { sender, message, teamId });
+    console.log(`Group message in team ${teamId} from ${sender}: ${message}`);
+  });
+
+  socket.on("disconnect", async () => {
+    const username = Object.keys(onlineUsers).find(
+      (key) => onlineUsers[key] === socket.id
+    );
+
+    if (username) {
+      delete onlineUsers[username];
+
+      try {
+        const user = await User.findOne({ username });
+        if (user) {
+          user.status = "offline";
+          await user.save();
+        }
+
+        console.log(`${username} is offline`);
+      } catch (err) {
+        console.error("Error setting user offline:", err);
+      }
+    }
+  });
 });
 
 const PORT = process.env.PORT;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`server is listening on port ${PORT}`);
 });

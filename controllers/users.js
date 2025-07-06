@@ -9,6 +9,10 @@ module.exports.getUsers = async (req, res) => {
   try {
     const users = await User.find({ username: { $ne: req.user.username } });
 
+    users.sort((a, b) =>
+      a.username.toLowerCase().localeCompare(b.username.toLowerCase())
+    );
+
     res.status(200).json(users);
   } catch (error) {
     res
