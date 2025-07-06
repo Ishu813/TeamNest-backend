@@ -138,6 +138,22 @@ io.on("connection", (socket) => {
       message: message,
     });
     await newMessage.save();
+
+    // Send message to receiver (if online)
+    if (onlineUsers[receiver]) {
+      io.to(onlineUsers[receiver]).emit("private-message", {
+        sender,
+        message,
+      });
+    }
+
+    // ALSO send message back to sender (to show it in their chat view)
+    if (onlineUsers[sender]) {
+      io.to(onlineUsers[sender]).emit("private-message", {
+        sender,
+        message,
+      });
+    }
   });
 
   socket.on("join-team", (teamId) => {
