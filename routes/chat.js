@@ -8,4 +8,6 @@ router
   .get(wrapAsync(chatController.getChats))
   .post(wrapAsync(chatController.sendChat));
 
+router.post("/ai", wrapAsync(chatController.getAIResponse));
+
 module.exports = router;

@@ -11,8 +11,6 @@ const methodOverride = require("method-override");
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
 const passport = require("passport");
-const ExpressError = require("./utils/ExpressError.js");
-
 const chatRouter = require("./routes/chat.js");
 const projectRouter = require("./routes/project.js");
 const taskRouter = require("./routes/task.js");
@@ -78,7 +76,7 @@ const sessionOptions = {
   saveUninitialized: true,
   cookie: {
     expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
-    maxage: 7 * 24 * 60 * 60 * 1000,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
@@ -178,7 +176,7 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", async () => {
     const username = Object.keys(onlineUsers).find(
-      (key) => onlineUsers[key] === socket.id
+      (key) => onlineUsers[key] === socket.id,
     );
 
     if (username) {
