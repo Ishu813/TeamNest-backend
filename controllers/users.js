@@ -113,7 +113,7 @@ module.exports.logout = async (req, res) => {
   const user = req.user;
   req.logout((err) => {
     if (err) {
-      return next(err);
+      return res.status(500).json({ message: "Failed to log out" });
     }
 
     req.session.destroy((err) => {
